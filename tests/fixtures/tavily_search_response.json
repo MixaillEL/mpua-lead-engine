@@ -1,0 +1,48 @@
+{
+  "query": "стоматологія Київ",
+  "results": [
+    {
+      "title": "Стоматологія Смайл — Офіційний сайт",
+      "url": "https://smile-dental.example.com/",
+      "content": "Сучасна стоматологічна клініка в Києві.",
+      "score": 0.91
+    },
+    {
+      "title": "Стоматологія Смайл - Контакти",
+      "url": "https://smile-dental.example.com/contacts",
+      "content": "Контактна інформація клініки.",
+      "score": 0.85
+    },
+    {
+      "title": "ТОП-10 стоматологій Києва 2026",
+      "url": "https://blog.example.com/top-10-dentists-kyiv",
+      "content": "Рейтинг кращих стоматологій.",
+      "score": 0.7
+    },
+    {
+      "title": "Smile Dental Kyiv (Facebook)",
+      "url": "https://facebook.com/smiledentalkyiv",
+      "content": "Facebook page",
+      "score": 0.6
+    },
+    {
+      "title": "Прайс-лист послуг.pdf",
+      "url": "https://smile-dental.example.com/pricing.pdf",
+      "content": "PDF price list",
+      "score": 0.5
+    },
+    {
+      "title": "",
+      "url": "https://noname.example.com/",
+      "content": "empty title result",
+      "score": 0.4
+    },
+    {
+      "title": "Dental Plus Clinic",
+      "url": "https://dentalplus.example.com/",
+      "content": "Family dental clinic in Kyiv.",
+      "score": 0.88
+    }
+  ],
+  "response_time": 0.42
+}

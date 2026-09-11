@@ -29,8 +29,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "integration: hits the real Overpass API; excluded by default (run with -m integration)",
+    "tavily_integration: hits the real Tavily Search API (needs TAVILY_API_KEY); excluded by default",
 ]
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration and not tavily_integration'"
 
 [build-system]
 requires = ["setuptools>=68"]

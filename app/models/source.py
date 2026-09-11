@@ -16,6 +16,7 @@ class SourceType(str, enum.Enum):
     directory = "directory"
     manual = "manual"
     openstreetmap = "openstreetmap"
+    web_search = "web_search"
     other = "other"
 
 

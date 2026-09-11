@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     WEBSITE_USER_AGENT: str = "MPUA-Lead-Engine/0.1"
     WEBSITE_MAX_RESPONSE_BYTES: int = 5_000_000
 
+    TAVILY_API_KEY: str = ""
+    TAVILY_API_URL: str = "https://api.tavily.com/search"
+    TAVILY_SEARCH_DEPTH: str = "basic"
+    TAVILY_MAX_RESULTS: int = 20
+    TAVILY_TIMEOUT: int = 20
+    TAVILY_MAX_REQUESTS_PER_JOB: int = 20
+    TAVILY_COST_PER_CREDIT_USD: float = 0.008
+
     @property
     def database_url(self) -> str:
         return (

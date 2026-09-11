@@ -293,6 +293,89 @@ python scripts/benchmark_osm_identity.py
 pytest tests/test_identity_synthetic_benchmark.py -v -s
 ```
 
+## Second discovery source: Tavily Web Search (MLE-007)
+
+`sources/tavily_search/` implements `TavilySearchAdapter`, a second,
+independent `SourceAdapter` (`source_type=web_search`) on top of the
+[Tavily Search API](https://tavily.com/) — **Basic Search only** (no
+generated answer, no advanced search, no raw content, no crawl/extract).
+It is used solely to discover official company websites, never as a
+source of rating/reviews.
+
+```
+Tavily -> RawCandidate -> Normalization -> Identity Resolution -> Company -> Website Enrichment
+```
+
+### Why Tavily instead of Brave
+
+Brave Search API was evaluated first but its developer dashboard returned
+HTTP 403 for the operator, so it was dropped as a project dependency
+before any code was committed. Tavily has a working free tier (1000
+credits/month, Basic Search = 1 credit) and is used instead.
+
+### Config
+
+```env
+TAVILY_API_KEY=
+TAVILY_API_URL=https://api.tavily.com/search
+TAVILY_SEARCH_DEPTH=basic
+TAVILY_MAX_RESULTS=20
+TAVILY_TIMEOUT=20
+TAVILY_MAX_REQUESTS_PER_JOB=20
+TAVILY_COST_PER_CREDIT_USD=0.008
+```
+
+`TAVILY_MAX_REQUESTS_PER_JOB` is a hard budget guard — once reached, the
+client raises `TavilySearchBudgetExceeded` and the adapter stops, returning
+whatever candidates it already collected instead of continuing to spend
+credits.
+
+### Query presets
+
+Same philosophy as the OSM preset registry (`sources/tavily_search/
+query_builder.py`) — 2 query variants per preset, `dentist` / `car_repair`
+/ `car_parts` / `hvac`. Unlike OSM, `hvac` works well here since it's plain
+text search rather than an OSM tag lookup.
+
+### Filtering (`sources/tavily_search/filters.py`)
+
+Reuses the MLE-005 shared-domain denylist (facebook.com, instagram.com,
+linkedin.com, youtube.com, tiktok.com, t.me, prom.ua, olx.ua, google.com)
+plus wikipedia.org/search-engine domains, a small known-directory list,
+file extensions (.pdf/.doc/...), search-result-page URLs, and a listicle/
+news/blog title-denyword heuristic (топ, кращі, рейтинг, список, каталог,
+огляд, новини, article, blog). Within one search run, results are
+deduplicated by normalized domain before filtering. This is a heuristic,
+not a classifier — false negatives (an unfiltered directory slipping
+through) are documented debt, not a crash risk.
+
+### Snippet policy
+
+Tavily's `content` (snippet) can be stale and is preserved **only** inside
+`RawCandidate.raw_payload` for provenance — `RawCandidate.description` is
+always left `None` for Tavily results, so a snippet never gets written
+into `Company.description` automatically.
+
+### Cost tracking
+
+Every `TavilySearchAdapter.search()` call exposes `last_api_requests`,
+`last_credits_used`, `last_estimated_cost_usd`, `last_results_received`,
+and `last_unique_domains` for reporting (adapter instance attributes —
+the `SourceAdapter` contract itself is unchanged).
+
+### Running the benchmarks
+
+```bash
+# Real API integration test (skipped, not failed, without TAVILY_API_KEY)
+pytest -m tavily_integration tests/test_tavily_search_integration.py -v -s
+
+# Manual relevance QA sample (20 candidates, title + website)
+python scripts/manual_qa_tavily.py
+
+# Combined OSM + Tavily benchmark: baseline -> merge -> enrich -> cost KPIs
+python scripts/benchmark_combined_osm_tavily.py
+```
+
 ## Website enrichment (MLE-006)
 
 `enrichment/website/` crawls a Company's own website (when it has one) to
