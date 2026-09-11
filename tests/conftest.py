@@ -24,3 +24,19 @@ def db_session(engine) -> Session:
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture()
+def committing_db_session(engine) -> Session:
+    """A plain session (own connection/transactions) for services that call
+    commit()/begin_nested() themselves, e.g. source_runner. Tests using this
+    fixture are responsible for deleting the rows they create; deleting a
+    Job cascades (DB-level ON DELETE CASCADE) to its Source/RawRecord rows.
+    """
+    SessionLocal = sessionmaker(bind=engine, future=True)
+    session = SessionLocal()
+
+    try:
+        yield session
+    finally:
+        session.close()
