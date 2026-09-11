@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Enum, String, Text
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,9 +33,21 @@ class Job(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # MLE-008 orchestration config. `query` above stays free-text/legacy
+    # (used directly by earlier stages' tests); orchestrated jobs are
+    # driven by these structured fields instead.
+    preset: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    regions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    sources_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    source_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    website_enrichment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
     sources: Mapped[list["Source"]] = relationship(
         "Source", back_populates="job", cascade="all, delete-orphan"
     )
     raw_records: Mapped[list["RawRecord"]] = relationship(
         "RawRecord", back_populates="job", cascade="all, delete-orphan"
+    )
+    runs: Mapped[list["JobRun"]] = relationship(
+        "JobRun", back_populates="job", cascade="all, delete-orphan"
     )

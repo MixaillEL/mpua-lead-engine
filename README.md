@@ -293,6 +293,61 @@ python scripts/benchmark_osm_identity.py
 pytest tests/test_identity_synthetic_benchmark.py -v -s
 ```
 
+## End-to-end job orchestrator (MLE-008)
+
+`app/services/job_orchestrator.py` is the single entrypoint that replaces
+running OSM/Tavily/normalization/identity/enrichment by hand. One `Job`
+(a specification: preset, regions, which sources, limits, whether to
+enrich) can be `run_job()`'d any number of times; each execution is a
+`JobRun` with its own `JobStageRun` history:
+
+```
+CREATED
+  -> DISCOVERY_OSM -> DISCOVERY_WEB_SEARCH
+  -> NORMALIZATION -> IDENTITY_RESOLUTION
+  -> WEBSITE_ENRICHMENT
+  -> FINALIZING
+  -> COMPLETED / FAILED / CANCELLED
+```
+
+- **Soft failure**: one discovery source being unavailable (OSM timeout,
+  missing `TAVILY_API_KEY`, an unsupported OSM preset like `hvac`) marks
+  that stage `skipped`/`failed` with a reason, adds a warning, and the
+  Job still completes on whatever source(s) worked.
+- **Fatal failure**: an exception in normalization, identity resolution,
+  or website enrichment marks the Job `FAILED` with `error` set.
+- **Cancellation**: `Job.status` is checked before each stage; a
+  cancelled Job stops before starting the next stage.
+- Each stage commits its own persisted state (discovery, identity, and
+  enrichment already commit internally) — a website timeout never rolls
+  back discovery.
+- A Company matched by both OSM and Tavily is enriched exactly once (the
+  enrichment batch is built from a `set` of company ids).
+- `JobRun.metrics` / each `JobStageRun.metrics` are persisted as JSON —
+  see `job_orchestrator.py` for the exact shape (raw_candidates,
+  unique_companies, new/matched/review, coverage percentages, per-source
+  metrics, cost, runtime).
+
+### CLI
+
+```bash
+python scripts/run_job.py --preset dentist --region Kyiv \
+    --osm-limit 100 --tavily-limit 20 --enrich
+
+python scripts/run_job.py --preset hvac --region Kyiv --region Lviv \
+    --no-osm --tavily-limit 20 --enrich
+```
+
+### API (blocking execution — see Technical debt below)
+
+```
+POST /jobs                  create a Job specification
+POST /jobs/{id}/run         run it end to end (blocking, returns final metrics)
+GET  /jobs/{id}             fetch a Job
+GET  /jobs/{id}/runs        list its JobRuns
+GET  /job-runs/{id}         fetch one JobRun
+```
+
 ## Second discovery source: Tavily Web Search (MLE-007)
 
 `sources/tavily_search/` implements `TavilySearchAdapter`, a second,
@@ -438,3 +493,20 @@ pytest -m integration tests/test_osm_integration.py -v
 # car_parts/Lviv), prints returned/with_name/with_phone/with_website/with_email/runtime
 python scripts/benchmark_osm_adapter.py
 ```
+
+## Technical debt (as of MLE-008)
+
+- `POST /jobs/{id}/run` executes the whole pipeline **synchronously**
+  (blocking the request) — there is no queue or background worker yet.
+  Fine for local/internal use; a real async execution model (Celery/RQ/
+  similar) is a future stage, not introduced here to keep scope tight.
+- No resume-from-stage: `JobRun`/`JobStageRun` are structured so this
+  could be added later, but a failed/cancelled run must currently be
+  re-run from the start (a new `JobRun`).
+- No scheduler — a `Job` is only ever triggered manually via the CLI or
+  `POST /jobs/{id}/run`.
+- No XLSX/CSV export (planned for `MLE-009`).
+- `http_requests` in `JobRun.metrics` is an approximation (OSM: one
+  Overpass call assumed per region; Tavily: actual tracked API requests;
+  website enrichment: `pages_requested`) rather than a byte-for-byte
+  request log.

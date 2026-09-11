@@ -8,6 +8,8 @@ from app.models.company_website import CompanyWebsite
 from app.models.address import Address
 from app.models.social_link import SocialLink, SocialPlatform
 from app.models.company_source import CompanySource
+from app.models.job_run import JobRun, PipelineStage
+from app.models.job_stage_run import JobStageRun, StageStatus
 
 __all__ = [
     "Job",
@@ -23,4 +25,8 @@ __all__ = [
     "SocialLink",
     "SocialPlatform",
     "CompanySource",
+    "JobRun",
+    "PipelineStage",
+    "JobStageRun",
+    "StageStatus",
 ]
