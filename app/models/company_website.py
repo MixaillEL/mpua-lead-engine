@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +10,9 @@ from db.base import Base
 
 class CompanyWebsite(Base):
     __tablename__ = "company_websites"
+    __table_args__ = (
+        UniqueConstraint("company_id", "domain", name="uq_company_website_domain"),
+    )
 
     id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id: Mapped[str] = mapped_column(

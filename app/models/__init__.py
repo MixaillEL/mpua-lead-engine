@@ -7,6 +7,7 @@ from app.models.company_email import CompanyEmail
 from app.models.company_website import CompanyWebsite
 from app.models.address import Address
 from app.models.social_link import SocialLink, SocialPlatform
+from app.models.company_source import CompanySource
 
 __all__ = [
     "Job",
@@ -21,4 +22,5 @@ __all__ = [
     "Address",
     "SocialLink",
     "SocialPlatform",
+    "CompanySource",
 ]

@@ -20,6 +20,7 @@ class Address(Base):
     street: Mapped[str | None] = mapped_column(String(500), nullable=True)
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     raw_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    normalized_address: Mapped[str | None] = mapped_column(String(1000), nullable=True, index=True)
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     source_id: Mapped[str | None] = mapped_column(

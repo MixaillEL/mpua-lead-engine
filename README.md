@@ -233,6 +233,66 @@ real-data benchmark:
 python scripts/benchmark_normalization.py
 ```
 
+## Identity resolution & deduplication (MLE-005)
+
+`processing/identity/` decides whether a `NormalizedCandidate` is a **new**
+Company, **matches** an existing one (auto-merge), or needs human **review**
+(never auto-merged). Only deterministic, exact-value signals are used — no
+fuzzy/AI/embedding matching.
+
+Pipeline after MLE-005:
+
+```
+RawCandidate -> Normalization -> NormalizedCandidate
+             -> Identity Resolution -> Company -> Contacts / Sources
+```
+
+### Scoring policy (see `processing/identity/signals.py`)
+
+| signal | weight | notes |
+|---|---|---|
+| same `Source.source_type` + `external_id` | 100 | idempotency: reprocessing the same raw record never creates a duplicate Company |
+| same normalized phone | 100 | |
+| same website domain | 100 | domain must not be in the shared-domain denylist |
+| same exact email address | 90 | the *domain* of a free/consumer email provider is never used as a signal — only the exact address |
+| same normalized_name + normalized_address (both exact) | 90 | |
+| same normalized_name + normalized_city (both exact) | 70 | intentionally capped below MATCH — many businesses share a generic name in one city |
+
+Decision thresholds: **score >= 90 -> MATCH** (auto-merge), **60-89 -> REVIEW**
+(never persisted as a Company), **< 60 -> NEW**.
+
+Shared domains (never a company-identity signal): `facebook.com`,
+`instagram.com`, `linkedin.com`, `youtube.com`, `tiktok.com`, `t.me`,
+`telegram.me`, `prom.ua`, `olx.ua`, `google.com`.
+
+Free email domains (exact address can still match; the domain alone never
+does): `gmail.com`, `ukr.net`, `i.ua`, `meta.ua`, `outlook.com`,
+`hotmail.com`, `yahoo.com`.
+
+**Principle:** a false positive (merging two different real companies) is
+worse than a false negative (a missed duplicate, left as REVIEW/NEW).
+Auto-merge only fires on strong, deterministic signals.
+
+### Provenance & idempotency
+
+A `company_sources` association table (`company_id`, `source_id`, unique
+pair) records every `Source` that confirmed a Company — deleting a `Source`
+never deletes a `Company`. `CompanyPhone`/`CompanyEmail`/`CompanyWebsite`
+each carry a `UNIQUE(company_id, <value>)` constraint (MySQL allows multiple
+`NULL`s in a unique index, so unset values never collide) so reprocessing
+the same candidate never duplicates a contact row.
+
+### Running the identity resolution benchmarks
+
+```bash
+# Real-data idempotency check: OSM dentist/Dnipro/limit=50, run twice
+python scripts/benchmark_osm_identity.py
+
+# Synthetic 100-candidate duplicate benchmark (precision/recall) — part of
+# the normal pytest run:
+pytest tests/test_identity_synthetic_benchmark.py -v -s
+```
+
 ### Running the integration tests / benchmark
 
 ```bash

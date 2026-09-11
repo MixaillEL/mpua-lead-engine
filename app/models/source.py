@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,6 +21,9 @@ class SourceType(str, enum.Enum):
 
 class Source(Base):
     __tablename__ = "sources"
+    __table_args__ = (
+        Index("ix_sources_type_external_id", "source_type", "external_id"),
+    )
 
     id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     source_type: Mapped[SourceType] = mapped_column(
