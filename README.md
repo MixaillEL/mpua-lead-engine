@@ -160,3 +160,61 @@ real MySQL/MariaDB (not SQLite) so ORM behavior matches production.
 
 Parsers (Google Maps, Google Search, websites), enrichment, deduplication
 logic, Telegram bot, UI/dashboard. These belong to later stages.
+
+## OpenStreetMap discovery source (MLE-003)
+
+`sources/osm/` implements `OpenStreetMapAdapter`, the first real discovery
+source, on top of the public Overpass API.
+
+**Public Overpass endpoint = development / validation source.** Do not run
+production or high-volume traffic against `https://overpass-api.de` — this
+adapter caps its own concurrency at 1 in-flight request and does at most 2
+retries with backoff. For real production use, point `OVERPASS_API_URL` (see
+`.env.example`) at a self-hosted Overpass instance or a local OSM extract.
+
+### Attribution / licensing
+
+```
+Contains information from OpenStreetMap,
+which is made available under the Open Database License (ODbL).
+```
+
+Any downstream export or publication built from OSM-derived data must carry
+this attribution and comply with ODbL share-alike requirements. This project
+does not implement a license-compliance engine — that is a separate concern
+from data collection.
+
+### Supported presets (v0.1)
+
+Only presets backed by an established, documented OSM tag are implemented;
+nothing is guessed:
+
+| preset key   | OSM tag               | notes |
+|--------------|------------------------|-------|
+| `dentist`    | `amenity=dentist`      | standard OSM tag for dental clinics |
+| `car_repair` | `shop=car_repair`      | standard tag for garages/STO |
+| `car_parts`  | `shop=car_parts`       | standard tag for auto parts stores |
+| `hvac`       | *(unsupported)*        | no single reliable canonical OSM tag |
+| `construction` | *(unsupported)*      | no single reliable canonical OSM tag |
+
+### Geography
+
+`region` is treated as a city name. For the 5 MLE-003 benchmark cities
+(Dnipro, Kyiv, Lviv, Odesa, Vinnytsia), the adapter queries by a static
+bounding-box fixture (`sources/osm/cities.py`) — `area["name"=...]`
+resolution proved unreliable against the public Overpass instance during
+development. Any other city falls back to Overpass area-name resolution,
+which may legitimately return 0 results if the area can't be resolved (not
+an error).
+
+### Running the integration tests / benchmark
+
+```bash
+# Real Overpass request + end-to-end MySQL persistence (excluded from the
+# default `pytest` run, see pyproject.toml addopts)
+pytest -m integration tests/test_osm_integration.py -v
+
+# Manual 3-scenario coverage benchmark (dentist/Dnipro, car_repair/Kyiv,
+# car_parts/Lviv), prints returned/with_name/with_phone/with_website/with_email/runtime
+python scripts/benchmark_osm_adapter.py
+```

@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     TEST_DB_USER: str = "root"
     TEST_DB_PASSWORD: str = ""
 
+    # Public Overpass endpoint = development / validation source only.
+    # Do not point production high-volume traffic at it.
+    OVERPASS_API_URL: str = "https://overpass-api.de/api/interpreter"
+    OVERPASS_TIMEOUT: int = 60
+
     @property
     def database_url(self) -> str:
         return (

@@ -1,0 +1,61 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API",
+  "elements": [
+    {
+      "type": "node",
+      "id": 111111,
+      "lat": 48.4647,
+      "lon": 35.0462,
+      "tags": {
+        "amenity": "dentist",
+        "name": "Dental Studio Dnipro",
+        "contact:phone": "+380 56 111 22 33",
+        "phone": "0561112233",
+        "contact:website": "https://dental-studio.example.com",
+        "website": "https://old-site.example.com",
+        "addr:street": "Yavornytskoho Ave",
+        "addr:housenumber": "12",
+        "addr:city": "Dnipro",
+        "addr:postcode": "49000"
+      }
+    },
+    {
+      "type": "way",
+      "id": 222222,
+      "center": {
+        "lat": 48.47,
+        "lon": 35.05
+      },
+      "tags": {
+        "amenity": "dentist",
+        "name": "Smile Clinic",
+        "phone": "+380561234567",
+        "addr:city": "Dnipro"
+      }
+    },
+    {
+      "type": "relation",
+      "id": 333333,
+      "center": {
+        "lat": 48.45,
+        "lon": 35.02
+      },
+      "tags": {
+        "amenity": "dentist",
+        "name": "OrthoDent Group",
+        "contact:email": "info@orthodent.example.com",
+        "email": "old@orthodent.example.com"
+      }
+    },
+    {
+      "type": "node",
+      "id": 444444,
+      "lat": 48.46,
+      "lon": 35.04,
+      "tags": {
+        "amenity": "dentist"
+      }
+    }
+  ]
+}

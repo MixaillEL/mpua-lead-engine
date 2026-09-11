@@ -26,6 +26,7 @@ class RawCandidate(BaseModel):
 
     phone: str | None = None
     website: str | None = None
+    email: str | None = None
 
     rating: float | None = None
     reviews_count: int | None = None
