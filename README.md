@@ -207,6 +207,32 @@ development. Any other city falls back to Overpass area-name resolution,
 which may legitimately return 0 results if the area can't be resolved (not
 an error).
 
+## Normalization layer (MLE-004)
+
+`processing/normalization/` turns a `RawCandidate` into a `NormalizedCandidate`
+(pure Pydantic transport model, not persisted): deterministic, network-free,
+DB-free text/phone/email/website/address normalization used later for
+dedup/matching. It does **not** create a `Company` — that decision belongs to
+a future dedup/matching stage.
+
+- `phone.py` — via `phonenumbers`, default region `UA`, E.164 output;
+  unparseable/invalid numbers become `phone_normalized=None` (never guessed).
+- `email.py` — trim + lowercase + basic syntax check; no SMTP/DNS/MX lookup.
+- `website.py` — canonical absolute URL + stable domain (no `www.`, IDNA-safe,
+  no fragment); no HTTP requests, no alive/dead check.
+- `company_name.py` — `canonical_name` is trim-only; `normalized_name` is
+  lowercased, Unicode-normalized, with Ukrainian legal-entity prefixes
+  (ТОВ/ФОП/ПП/ПРАТ/ПАТ/АТ/ДП/КП) stripped as whole tokens only.
+- `address.py` — plain text cleanup (trim/lowercase/collapse spaces); no
+  geocoding, no street-name correction.
+
+Run `pytest` (normalization tests are included in the default run) and the
+real-data benchmark:
+
+```bash
+python scripts/benchmark_normalization.py
+```
+
 ### Running the integration tests / benchmark
 
 ```bash
