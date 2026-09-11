@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     OVERPASS_API_URL: str = "https://overpass-api.de/api/interpreter"
     OVERPASS_TIMEOUT: int = 60
 
+    WEBSITE_TIMEOUT: int = 15
+    WEBSITE_MAX_PAGES: int = 5
+    WEBSITE_MAX_CONCURRENCY: int = 5
+    WEBSITE_USER_AGENT: str = "MPUA-Lead-Engine/0.1"
+    WEBSITE_MAX_RESPONSE_BYTES: int = 5_000_000
+
     @property
     def database_url(self) -> str:
         return (

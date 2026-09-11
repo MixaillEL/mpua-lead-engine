@@ -293,6 +293,57 @@ python scripts/benchmark_osm_identity.py
 pytest tests/test_identity_synthetic_benchmark.py -v -s
 ```
 
+## Website enrichment (MLE-006)
+
+`enrichment/website/` crawls a Company's own website (when it has one) to
+find additional phones/emails/socials and merges them into the *existing*
+Company — it never creates or merges Companies, and never reruns identity
+resolution.
+
+```
+Company -> website -> homepage + up to 4 discovered contact/about pages
+        -> extract phone/email/social (tel:/mailto:/JSON-LD/microdata/visible text)
+        -> normalize (reuses MLE-004) -> idempotent CompanyPhone/CompanyEmail/SocialLink
+```
+
+### Config
+
+```env
+WEBSITE_TIMEOUT=15
+WEBSITE_MAX_PAGES=5
+WEBSITE_MAX_CONCURRENCY=5
+WEBSITE_USER_AGENT=MPUA-Lead-Engine/0.1
+WEBSITE_MAX_RESPONSE_BYTES=5000000
+```
+
+### Crawl scope
+
+- Same-domain only (`www.` stripped for comparison); external links are
+  extracted (socials) but never followed.
+- Homepage + up to `WEBSITE_MAX_PAGES - 1` links whose href/text match a
+  contact/about keyword list (EN + UA: contact(s), kontakt(y), контакт(и),
+  зв'язок, about(-us), про нас, pro-nas), contact-priority first.
+  `/login`, `/signin`, `/cart`, `/checkout`, `/search`, `/wp-admin`,
+  `/admin` paths are skipped. The `visited` set uses a normalized URL
+  (fragment + `utm_*`/`fbclid`/`gclid` stripped) so crawl loops can't occur.
+- A Company's own website is never picked from the shared-domain denylist
+  (facebook.com, instagram.com, t.me, prom.ua, olx.ua, ...) reused from
+  MLE-005 — those are never treated as "the company's website".
+- Retry policy: timeout/network error -> up to 2 retries; HTTP 429 -> 1
+  retry with backoff; HTTP 5xx -> 1 retry; HTTP 404/other 4xx -> no retry.
+- Only `text/html`/`application/xhtml+xml` responses are parsed; binary
+  content is ignored. Response bodies are capped at
+  `WEBSITE_MAX_RESPONSE_BYTES` (truncated, not crashed).
+- No JS rendering (no Playwright), no `robots.txt` fetching — the crawl is
+  bounded by the page limit + same-domain + skip-path rules instead
+  (documented debt, see below).
+
+### Running the benchmark
+
+```bash
+python scripts/benchmark_website_enrichment.py
+```
+
 ### Running the integration tests / benchmark
 
 ```bash
