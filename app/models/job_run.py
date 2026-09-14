@@ -53,3 +53,6 @@ class JobRun(Base):
     stage_runs: Mapped[list["JobStageRun"]] = relationship(
         "JobStageRun", back_populates="job_run", cascade="all, delete-orphan"
     )
+    job_run_companies: Mapped[list["JobRunCompany"]] = relationship(
+        "JobRunCompany", back_populates="job_run", cascade="all, delete-orphan"
+    )

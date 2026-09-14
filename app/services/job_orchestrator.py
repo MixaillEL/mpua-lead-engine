@@ -28,6 +28,7 @@ from app.models.company_phone import CompanyPhone
 from app.models.company_website import CompanyWebsite
 from app.models.job import Job, JobStatus
 from app.models.job_run import JobRun, PipelineStage
+from app.models.job_run_company import JobRunCompany, JobRunCompanyResolution
 from app.models.job_stage_run import JobStageRun, StageStatus
 from app.models.social_link import SocialLink
 from app.services.source_runner import persist_candidate
@@ -103,6 +104,47 @@ def _finish_stage(
     stage_run.output_count = output_count
     stage_run.metrics = metrics
     stage_run.error = error
+    db.commit()
+
+
+def _record_job_run_companies(db: Session, job_run_id: str, identity_results: list) -> None:
+    """One JobRunCompany row per Company this run touched (NEW or MATCH).
+    REVIEW is excluded — it never persists a Company. Handles OSM+Tavily
+    resolving to the same Company within one run by aggregating
+    source_count and upgrading resolution to "new" if any contributing
+    result created it.
+    """
+
+    by_company: dict[str, dict] = {}
+    for result in identity_results:
+        if not result.company_id or result.decision not in (Decision.NEW, Decision.MATCH):
+            continue
+        entry = by_company.setdefault(result.company_id, {"count": 0, "is_new": False})
+        entry["count"] += 1
+        if result.decision == Decision.NEW:
+            entry["is_new"] = True
+
+    for company_id, entry in by_company.items():
+        existing = db.scalar(
+            select(JobRunCompany).where(
+                JobRunCompany.job_run_id == job_run_id, JobRunCompany.company_id == company_id
+            )
+        )
+        resolution = JobRunCompanyResolution.new if entry["is_new"] else JobRunCompanyResolution.matched
+        if existing is None:
+            db.add(
+                JobRunCompany(
+                    job_run_id=job_run_id,
+                    company_id=company_id,
+                    resolution=resolution,
+                    source_count=entry["count"],
+                )
+            )
+        else:
+            existing.source_count += entry["count"]
+            if resolution == JobRunCompanyResolution.new:
+                existing.resolution = JobRunCompanyResolution.new
+
     db.commit()
 
 
@@ -378,6 +420,8 @@ async def run_job(db: Session, job_id: str) -> JobRunResult:
         r.company_id for r in identity_results if r.company_id and r.decision in (Decision.NEW, Decision.MATCH)
     }
     review_count = sum(1 for r in identity_results if r.decision == Decision.REVIEW)
+
+    _record_job_run_companies(db, job_run.id, identity_results)
 
     # ---------------- Website enrichment ----------------
     enrichment_metrics = {"attempted": 0, "alive": 0, "dead": 0, "failed": 0, "pages_requested": 0}

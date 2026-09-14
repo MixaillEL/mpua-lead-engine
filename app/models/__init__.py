@@ -10,6 +10,7 @@ from app.models.social_link import SocialLink, SocialPlatform
 from app.models.company_source import CompanySource
 from app.models.job_run import JobRun, PipelineStage
 from app.models.job_stage_run import JobStageRun, StageStatus
+from app.models.job_run_company import JobRunCompany, JobRunCompanyResolution
 
 __all__ = [
     "Job",
@@ -29,4 +30,6 @@ __all__ = [
     "PipelineStage",
     "JobStageRun",
     "StageStatus",
+    "JobRunCompany",
+    "JobRunCompanyResolution",
 ]

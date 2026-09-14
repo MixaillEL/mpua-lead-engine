@@ -494,7 +494,93 @@ pytest -m integration tests/test_osm_integration.py -v
 python scripts/benchmark_osm_adapter.py
 ```
 
-## Technical debt (as of MLE-008)
+## Client export (MLE-009)
+
+`exporters/` turns one **completed** `JobRun` into a client-ready
+`.xlsx`/`.csv` file — scoped strictly through the `job_run_companies`
+table (never "all Companies in the DB"), one row per Company, no
+Cartesian duplication from multiple phones/emails/sources.
+
+```
+JobRun (COMPLETED) -> job_run_companies -> dataset.py (batch-loaded,
+no N+1) -> ExportRow[] -> csv_exporter.py / xlsx_exporter.py -> file
+```
+
+### `job_run_companies`
+
+Records exactly which Companies a `JobRun` created (`new`) or matched
+(`matched`) during `IDENTITY_RESOLUTION` — `REVIEW` results are never
+linked here since they don't persist a Company. `UNIQUE(job_run_id,
+company_id)` means a Company matched by both OSM and Tavily in the same
+run gets one row with `source_count=2`, not two rows. Reconstructing this
+after the fact from `Source`/`Job` would be unreliable once a Company has
+been touched by multiple `JobRun`s, which is why this is an explicit
+table rather than a derived query.
+
+### What's in a row
+
+`Company, Category, Country, Region, City, Address, Phone 1-3, Email
+1-3, Website, Facebook, Instagram, Telegram, LinkedIn, YouTube, TikTok,
+Rating, Reviews, Source Types, Source URLs, First Seen, Last Seen` — see
+`exporters/models.py` (`ExportRow`). Only normalized/validated contact
+values are ever exported (E.164 phones, validated emails, canonical
+website URLs) — internal-only fields (normalized_name, confidence
+scores, raw payloads) never leave the DB. When a Company has more than 3
+phones/emails, the top 3 by confidence (then most recently observed,
+then value) are kept — see Technical debt below.
+
+### CSV
+
+UTF-8 **with BOM** (so Excel-on-Windows opens Cyrillic correctly),
+delimiter configurable via `EXPORT_CSV_DELIMITER` (default `;`).
+Formula-injection guard: any text cell starting with `=`, `+`, `-`, or
+`@` gets a leading `'` — this deliberately includes E.164 phone numbers
+(which start with `+`); the apostrophe is an Excel/CSV text-forcing
+marker, invisible once opened in a spreadsheet app. Numeric fields
+(`Rating`, `Reviews`) are never prefixed.
+
+### XLSX
+
+Two sheets: `Companies` (bold frozen header, autofilter, sensible
+column widths, wrapped Address/Source URLs, formatted First/Last Seen
+dates, clickable Website/Email hyperlinks) and `Summary`, built directly
+from `JobRun.metrics` — coverage/counts are never recomputed separately,
+so the sheet can't drift from what the orchestrator persisted. When any
+exported row carries an `openstreetmap` source, the Summary sheet adds
+the required ODbL attribution line (not repeated per row).
+
+### Config
+
+```env
+EXPORT_DIR=exports
+EXPORT_CSV_DELIMITER=;
+```
+
+Files are written under `EXPORT_DIR` (created automatically) with a
+deterministic, sanitized filename:
+`<date>_<preset>_<regions>_<job_run_short_id>.xlsx`. `job_run_id` from
+the API/CLI is only ever used as a DB lookup key — the actual file path
+is always built from server-side config + sanitized slugs, never taken
+from client input, so there's no path-traversal surface.
+
+### CLI
+
+```bash
+python scripts/export_job_run.py <job_run_id> --format xlsx
+python scripts/export_job_run.py <job_run_id> --format csv
+```
+
+### API
+
+```
+GET /job-runs/{id}/export.xlsx
+GET /job-runs/{id}/export.csv
+```
+
+Returns 404 for an unknown `JobRun`, 409 if it isn't `COMPLETED` (no
+partial export in v0.1).
+
+## Technical debt (as of MLE-009)
 
 - `POST /jobs/{id}/run` executes the whole pipeline **synchronously**
   (blocking the request) — there is no queue or background worker yet.
@@ -505,8 +591,13 @@ python scripts/benchmark_osm_adapter.py
   re-run from the start (a new `JobRun`).
 - No scheduler — a `Job` is only ever triggered manually via the CLI or
   `POST /jobs/{id}/run`.
-- No XLSX/CSV export (planned for `MLE-009`).
 - `http_requests` in `JobRun.metrics` is an approximation (OSM: one
   Overpass call assumed per region; Tavily: actual tracked API requests;
   website enrichment: `pages_requested`) rather than a byte-for-byte
   request log.
+- Export only keeps the top 3 phones/emails per Company (nothing is lost
+  in the DB, just not shown to the client past 3).
+- Export files under `EXPORT_DIR` are never cleaned up automatically —
+  manual/cron cleanup is left to the operator for now.
+- No client-specific column templates, no Google Sheets export, no
+  scheduled export.

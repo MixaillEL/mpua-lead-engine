@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     TAVILY_MAX_REQUESTS_PER_JOB: int = 20
     TAVILY_COST_PER_CREDIT_USD: float = 0.008
 
+    EXPORT_DIR: str = "exports"
+    EXPORT_CSV_DELIMITER: str = ";"
+
     @property
     def database_url(self) -> str:
         return (
